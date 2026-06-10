@@ -802,6 +802,11 @@ body {
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
+  /* Kill expensive effects on mobile */
+  .sakura-container { display: none; }
+  .header, .sidebar-card { backdrop-filter: none; }
+  .sidebar-card { background: var(--card-bg); }
+
   /* Header: scroll away with page */
   .header {
     position: static;
@@ -854,8 +859,14 @@ body {
   .post-tag { font-size: 0.7em; padding: 2px 8px; }
 
   .admin-panel { width: 95%; padding: 16px; }
-  .music-toggle { width: 46px; height: 46px; bottom: 16px; right: 12px; font-size: 1.2em; border-radius: 14px; }
+  .music-toggle { width: 46px; height: 46px; bottom: 16px; right: 12px; font-size: 1.2em; border-radius: 14px; animation: none; }
   .fab { width: 42px; height: 42px; bottom: 16px; left: 12px; font-size: 1.1em; border-radius: 12px; }
+
+  /* Disable transitions/animations on mobile */
+  body { transition: none; }
+  .post-card:hover { transform: none; }
+  .post-image-wrap:hover { transform: none; }
+  .drop-zone:hover, .drop-zone.drag-over { transform: none; }
 }
 </style>
 </head>
