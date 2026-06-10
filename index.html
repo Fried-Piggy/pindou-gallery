@@ -803,25 +803,49 @@ body {
 @media (max-width: 768px) {
   .app-container {
     flex-direction: column;
-    padding: 12px;
-    gap: 16px;
+    padding: 8px;
+    gap: 10px;
   }
   .sidebar {
     width: 100%;
     position: static;
     max-height: none;
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
   .sidebar-card {
-    min-width: 180px;
-    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 12px;
+    font-size: 0.85em;
   }
-  .header-title { font-size: 1.4em; }
-  .post-images { grid-template-columns: repeat(3, 1fr); }
-  .admin-panel { width: 95%; padding: 20px; }
+  /* Profile spans full width */
+  #profileCard { grid-column: 1 / -1; }
+  #aboutCard { grid-column: 1 / -1; }
+
+  .profile-container { gap: 10px; }
+  .profile-avatar-wrap { width: 48px; height: 48px; border-radius: 12px; }
+  .profile-name { font-size: 1em; }
+  .profile-bio { font-size: 0.75em; }
+
+  .header { padding: 14px 12px; }
+  .header-title { font-size: 1.3em; }
+  .header-subtitle { font-size: 0.75em; }
+
+  .post-images { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .post-card { border-radius: 14px; }
+  .post-header { padding: 10px 14px 8px; gap: 8px; }
+  .post-avatar { width: 36px; height: 36px; border-radius: 10px; font-size: 1.2em; }
+  .post-title { font-size: 0.95em; }
+  .post-date { font-size: 0.7em; }
+  .post-body { padding: 6px 14px; font-size: 0.85em; }
+  .post-images { padding: 0 14px 12px; }
+  .post-footer { padding: 8px 14px; }
+  .post-tag { font-size: 0.7em; padding: 2px 8px; }
+
+  .admin-panel { width: 95%; padding: 16px; }
+  .music-toggle { width: 48px; height: 48px; bottom: 20px; right: 16px; font-size: 1.3em; border-radius: 14px; }
+  .fab { width: 44px; height: 44px; bottom: 20px; left: 16px; font-size: 1.2em; border-radius: 12px; }
 }
 </style>
 </head>
