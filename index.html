@@ -982,8 +982,8 @@ body {
           <div class="drop-zone-hint">
             <span style="font-size:2em;">📁</span>
             <span>拖拽图片到这里（或点击选择）</span>
-            <span style="font-size:0.75em;opacity:0.6;">支持 JPG / PNG / GIF / WebP — 自动压缩至1600px</span>
-            <span style="font-size:0.7em;opacity:0.5;">💡 图片嵌入在 JSON 中，导出时一并下载。每张图可点⬇单独保存</span>
+            <span style="font-size:0.75em;opacity:0.6;">支持 JPG / PNG / GIF / WebP</span>
+            <span style="font-size:0.7em;opacity:0.5;">💡 保存时自动上传到 images/ 文件夹（需用 server.py 启动）</span>
           </div>
           <input type="file" id="fileInput" accept="image/*" multiple style="display:none;">
         </div>
@@ -1032,7 +1032,7 @@ let isAdmin = false;
 let adminClickCount = 0;
 let editingPostId = null;
 let musicPlaylist = [];
-let droppedImages = []; // [{dataUrl, filename, size}] — temp storage while editing
+let droppedImages = []; // [{file, objectUrl, filename}] — temp storage while editing
 
 // ============ Init ============
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1227,12 +1227,10 @@ function renderPostCard(post) {
   const imagesHTML = images.length > 0 ? `
     <div class="post-images">
       ${images.map(img => {
-        const src = img.trim();
-        const isDataUrl = src.startsWith('data:');
-        const displaySrc = isDataUrl ? src : 'images/' + src;
+        const src = 'images/' + img.trim();
         return `
-        <div class="post-image-wrap" onclick="openLightbox('${escapeHTML(displaySrc)}')">
-          <img src="${escapeHTML(displaySrc)}" alt="${escapeHTML(post.title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'post-image-placeholder\\'>🧩</div>'">
+        <div class="post-image-wrap" onclick="openLightbox('${escapeHTML(src)}')">
+          <img src="${escapeHTML(src)}" alt="${escapeHTML(post.title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'post-image-placeholder\\'>🧩</div>'">
         </div>`;
       }).join('')}
     </div>
@@ -1448,9 +1446,9 @@ function bindEvents() {
   document.getElementById('fabNewPost').addEventListener('click', () => openPostForm());
 
   // Admin panel
-  document.getElementById('postForm').addEventListener('submit', (e) => {
+  document.getElementById('postForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    savePost();
+    await savePost();
   });
   document.getElementById('btnCancelPost').addEventListener('click', closePostForm);
   document.getElementById('btnDeletePost').addEventListener('click', () => {
@@ -1492,7 +1490,6 @@ function toggleAdmin() {
   isAdmin = !isAdmin;
   const fab = document.getElementById('fabNewPost');
   const exportBtn = document.getElementById('btnExport');
-  const exportImgBtn = document.getElementById('btnExportImages');
   const storageBar = document.getElementById('storageBar');
   const editAboutBtn = document.getElementById('btnEditAbout');
   const editProfileBtn = document.getElementById('btnEditProfile');
@@ -1500,7 +1497,6 @@ function toggleAdmin() {
   if (isAdmin) {
     fab.classList.add('visible');
     if (exportBtn) exportBtn.style.display = 'block';
-    if (exportImgBtn) exportImgBtn.style.display = 'block';
     if (storageBar) { storageBar.style.display = 'block'; updateStorageInfo(); }
     if (editAboutBtn) editAboutBtn.style.display = '';
     if (editProfileBtn) editProfileBtn.style.display = '';
@@ -1511,7 +1507,6 @@ function toggleAdmin() {
   } else {
     fab.classList.remove('visible');
     if (exportBtn) exportBtn.style.display = 'none';
-    if (exportImgBtn) exportImgBtn.style.display = 'none';
     if (storageBar) storageBar.style.display = 'none';
     if (editAboutBtn) editAboutBtn.style.display = 'none';
     if (editProfileBtn) editProfileBtn.style.display = 'none';
@@ -1550,12 +1545,13 @@ function openPostForm(postId = null) {
       document.getElementById('postDate').value = post.date || '';
       document.getElementById('postDesc').value = post.description || '';
       document.getElementById('postTags').value = Array.isArray(post.tags) ? post.tags.join(', ') : (post.tags || '');
-      // Restore images from post data
+      // Restore images from post data (filenames only, no files)
       const imgs = Array.isArray(post.images) ? post.images : [];
       droppedImages = imgs.map(src => ({
-        dataUrl: src,
-        filename: src.startsWith('data:') ? 'image_' + Date.now() : src.split('/').pop(),
-        size: src.startsWith('data:') ? Math.round(src.length * 0.75 / 1024) : 0 // rough KB estimate
+        file: null,
+        objectUrl: null,
+        filename: src.startsWith('data:') ? 'old_image.jpg' : src,
+        size: 0
       }));
       titleEl.textContent = '✏️ 编辑动态';
       btnDelete.style.display = '';
@@ -1576,7 +1572,7 @@ function closePostForm() {
   droppedImages = [];
 }
 
-function savePost() {
+async function savePost() {
   const id = document.getElementById('postId').value;
   const title = document.getElementById('postTitle').value.trim();
   const date = document.getElementById('postDate').value;
@@ -1588,7 +1584,22 @@ function savePost() {
     return;
   }
 
-  const images = droppedImages.map(d => d.dataUrl);
+  // Upload new images to server, keep existing filenames
+  const images = [];
+  for (const d of droppedImages) {
+    if (d.file) {
+      try {
+        const filename = await uploadImage(d.file, d.filename);
+        images.push(filename);
+      } catch(e) {
+        showToast('⚠️ 上传失败：' + d.filename + ' — ' + e.message);
+        return;
+      }
+    } else {
+      images.push(d.filename);
+    }
+  }
+
   const tags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
 
   const postData = { id: id || generateId(), title, date, description, images, tags };
@@ -1603,7 +1614,7 @@ function savePost() {
   saveLightBackup();
   renderAll();
   closePostForm();
-  showToast('✅ 动态已保存！记得导出 posts.json 保存到本地文件');
+  showToast('✅ 动态已保存！图片已存入 images/ 文件夹');
 }
 
 function editPost(id) {
@@ -1644,19 +1655,16 @@ function setupDropZone() {
   });
 }
 
-async function handleDroppedFiles(files) {
+function handleDroppedFiles(files) {
   for (const file of files) {
     if (!file.type.startsWith('image/')) continue;
-    try {
-      const dataUrl = await resizeImage(file);
-      droppedImages.push({
-        dataUrl: dataUrl,
-        filename: file.name,
-        size: Math.round(dataUrl.length * 0.75 / 1024) // KB
-      });
-    } catch(e) {
-      console.error('Failed to process image:', file.name, e);
-    }
+    const objectUrl = URL.createObjectURL(file);
+    droppedImages.push({
+      file: file,
+      objectUrl: objectUrl,
+      filename: file.name,
+      size: Math.round(file.size / 1024)
+    });
   }
   renderImagePreviews();
 }
@@ -1704,18 +1712,20 @@ function renderImagePreviews() {
   if (zone) { zone.classList.add('has-images'); }
 
   container.innerHTML = droppedImages.map((d, i) => {
-    const src = d.dataUrl.startsWith('data:') ? d.dataUrl : 'images/' + d.dataUrl;
+    // Use objectUrl for new files, images/ path for existing
+    const src = d.objectUrl || ('images/' + d.filename);
     return `
     <div class="image-preview-item">
       <img src="${escapeHTML(src)}" alt="${escapeHTML(d.filename)}" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:2em;\\'>🧩</div>'">
-      <span class="img-size-badge">${d.size}KB</span>
+      <span class="img-size-badge">${d.size || ''}KB</span>
       <button class="remove-img" onclick="removeDroppedImage(${i})" title="移除">✕</button>
-      <button class="download-img-btn" onclick="event.stopPropagation();downloadImage(droppedImages[${i}].dataUrl, droppedImages[${i}].filename)" title="下载图片">⬇</button>
     </div>`;
   }).join('');
 }
 
 function removeDroppedImage(index) {
+  const d = droppedImages[index];
+  if (d && d.objectUrl) URL.revokeObjectURL(d.objectUrl);
   droppedImages.splice(index, 1);
   renderImagePreviews();
 }
@@ -1989,19 +1999,10 @@ function createExportButton() {
   const exportBtn = document.createElement('button');
   exportBtn.className = 'btn btn-secondary';
   exportBtn.textContent = '📦 导出 posts.json';
-  exportBtn.style.cssText = 'position:fixed;bottom:220px;left:30px;z-index:201;display:none;';
+  exportBtn.style.cssText = 'position:fixed;bottom:160px;left:30px;z-index:201;display:none;';
   exportBtn.id = 'btnExport';
   exportBtn.addEventListener('click', exportJSON);
   document.body.appendChild(exportBtn);
-
-  // Export images button
-  const imgExportBtn = document.createElement('button');
-  imgExportBtn.className = 'btn btn-secondary';
-  imgExportBtn.textContent = '🖼️ 导出图片文件';
-  imgExportBtn.style.cssText = 'position:fixed;bottom:160px;left:30px;z-index:201;display:none;';
-  imgExportBtn.id = 'btnExportImages';
-  imgExportBtn.addEventListener('click', exportAllImages);
-  document.body.appendChild(imgExportBtn);
 
   // Storage info bar
   const storageBar = document.createElement('div');
