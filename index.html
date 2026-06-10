@@ -417,12 +417,21 @@ body {
   object-fit: cover;
   display: block;
 }
-.post-image-placeholder {
+.lazy-img-wrap .post-image-placeholder {
   width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
   font-size: 3em;
   color: var(--accent2);
 }
+.lazy-img-wrap.loaded .post-image-placeholder { display: none; }
+.lazy-img-wrap img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.lazy-img-wrap.loaded img { opacity: 1; }
 .post-footer {
   padding: 12px 20px;
   border-top: 1px solid var(--accent-light);
@@ -1215,6 +1224,7 @@ function renderAll() {
   renderDateFilter();
   renderAbout();
   renderProfile();
+  setTimeout(initLazyLoad, 100);
 }
 
 function renderTimeline(filterYearMonth = 'all') {
@@ -1244,8 +1254,8 @@ function renderPostCard(post) {
       ${images.map(img => {
         const src = 'images/' + img.trim();
         return `
-        <div class="post-image-wrap" onclick="openLightbox('${escapeHTML(src)}')">
-          <img src="${escapeHTML(src)}" alt="${escapeHTML(post.title)}" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'post-image-placeholder\\'>🧩</div>'">
+        <div class="post-image-wrap lazy-img-wrap" onclick="openLightbox('${escapeHTML(src)}')" data-src="${escapeHTML(src)}">
+          <div class="post-image-placeholder">🧩</div>
         </div>`;
       }).join('')}
     </div>
@@ -1420,6 +1430,7 @@ function bindEvents() {
   // Date filter
   document.getElementById('dateSelect').addEventListener('change', (e) => {
     renderTimeline(e.target.value);
+    setTimeout(initLazyLoad, 100);
   });
 
   // Theme switcher
@@ -1521,6 +1532,7 @@ function toggleAdmin() {
   renderTimeline(getActiveFilter());
   renderAbout();
   renderProfile();
+  setTimeout(initLazyLoad, 100);
 }
 
 function getActiveFilter() {
@@ -1921,6 +1933,37 @@ function savePlaylist() {
   renderMusicTracks();
   renderMusicEditor();
   showToast('✅ 播放列表已保存');
+}
+
+// ============ Lazy Load Images ============
+let lazyObserver = null;
+function initLazyLoad() {
+  if ('IntersectionObserver' in window) {
+    lazyObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const wrap = entry.target;
+          const src = wrap.dataset.src;
+          if (src && !wrap.classList.contains('loaded')) {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = '';
+            img.onerror = () => { wrap.innerHTML = '<div class=\"post-image-placeholder\">🧩</div>'; };
+            img.onload = () => wrap.classList.add('loaded');
+            wrap.appendChild(img);
+            lazyObserver.unobserve(wrap);
+          }
+        }
+      });
+    }, { rootMargin: '200px' });
+    document.querySelectorAll('.lazy-img-wrap').forEach(w => lazyObserver.observe(w));
+  } else {
+    // Fallback for old browsers
+    document.querySelectorAll('.lazy-img-wrap').forEach(w => {
+      const src = w.dataset.src;
+      if (src) w.innerHTML = `<img src="${src}" alt="" onerror="this.parentElement.innerHTML='<div class=\"post-image-placeholder\">🧩</div>'">`;
+    });
+  }
 }
 
 // ============ Sakura Animation ============
