@@ -1270,20 +1270,26 @@ function renderTimeline(filterYearMonth = 'all', append = false) {
     timeline.querySelector('.posts-list').insertAdjacentHTML('beforeend', batchHTML);
   }
 
-  // Add "load more" sentinel if more posts remain
+  // Auto-load more on scroll to bottom
   const existingSentinel = document.getElementById('loadMoreSentinel');
   if (existingSentinel) existingSentinel.remove();
 
   if (renderedCount < currentFilteredPosts.length) {
     const sentinel = document.createElement('div');
     sentinel.id = 'loadMoreSentinel';
-    sentinel.style.cssText = 'height:40px;text-align:center;padding:10px;color:var(--text-secondary);font-size:0.85em;cursor:pointer;';
-    sentinel.textContent = `📜 加载更多 (${currentFilteredPosts.length - renderedCount} 条)`;
-    sentinel.addEventListener('click', () => {
-      renderTimeline(filterYearMonth, true);
-      setTimeout(initLazyLoad, 100);
-    });
+    sentinel.style.cssText = 'height:20px;';
     timeline.querySelector('.posts-list').appendChild(sentinel);
+
+    const loadMoreObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          loadMoreObserver.unobserve(entry.target);
+          renderTimeline(filterYearMonth, true);
+          setTimeout(initLazyLoad, 100);
+        }
+      });
+    }, { rootMargin: '400px' });
+    loadMoreObserver.observe(sentinel);
   }
 
 }
