@@ -287,30 +287,24 @@ body {
   flex-direction: column;
   gap: 4px;
 }
-.date-filter-item {
-  padding: 8px 12px;
+.date-select {
+  width: 100%;
+  padding: 10px 12px;
   border-radius: 10px;
-  cursor: pointer;
+  border: 2px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
   font-size: 0.9em;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: auto;
+  transition: border-color 0.2s;
 }
-.date-filter-item:hover {
-  background: var(--accent-light);
-  color: var(--accent);
-}
-.date-filter-item.active {
-  background: var(--accent);
-  color: white;
-  font-weight: 600;
-}
-.date-filter-count {
-  font-size: 0.75em;
-  opacity: 0.7;
-  margin-left: auto;
+.date-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 /* Theme selector */
@@ -889,11 +883,9 @@ body {
     <!-- Date Filter -->
     <div class="sidebar-card">
       <div class="sidebar-title">📅 按日期筛选</div>
-      <ul class="date-filter-list" id="dateFilterList">
-        <li class="date-filter-item active" data-filter="all">
-          🌟 全部动态 <span class="date-filter-count" id="countAll">0</span>
-        </li>
-      </ul>
+      <select class="date-select" id="dateSelect">
+        <option value="all">🌟 全部动态</option>
+      </select>
     </div>
 
     <!-- Theme Switcher -->
@@ -1268,28 +1260,18 @@ function renderPostCard(post) {
 }
 
 function renderDateFilter() {
-  const list = document.getElementById('dateFilterList');
+  const select = document.getElementById('dateSelect');
+  if (!select) return;
   const yearMonths = getYearMonths();
   const totalCount = posts.length;
 
-  document.getElementById('countAll').textContent = totalCount;
-
-  const monthItems = yearMonths.map(ym => {
+  let html = `<option value="all">🌟 全部动态 (${totalCount})</option>`;
+  yearMonths.forEach(ym => {
     const count = posts.filter(p => p.date && p.date.startsWith(ym)).length;
     const [year, month] = ym.split('-');
-    return `
-      <li class="date-filter-item" data-filter="${ym}">
-        📌 ${year}年${parseInt(month)}月
-        <span class="date-filter-count">${count}</span>
-      </li>`;
-  }).join('');
-
-  list.innerHTML = `
-    <li class="date-filter-item active" data-filter="all">
-      🌟 全部动态 <span class="date-filter-count">${totalCount}</span>
-    </li>
-    ${monthItems}
-  `;
+    html += `<option value="${ym}">📌 ${year}年${parseInt(month)}月 (${count})</option>`;
+  });
+  select.innerHTML = html;
 }
 
 // ============ About Section ============
@@ -1413,12 +1395,8 @@ function cancelProfile() {
 // ============ Events ============
 function bindEvents() {
   // Date filter
-  document.getElementById('dateFilterList').addEventListener('click', (e) => {
-    const item = e.target.closest('.date-filter-item');
-    if (!item) return;
-    document.querySelectorAll('.date-filter-item').forEach(el => el.classList.remove('active'));
-    item.classList.add('active');
-    renderTimeline(item.dataset.filter);
+  document.getElementById('dateSelect').addEventListener('change', (e) => {
+    renderTimeline(e.target.value);
   });
 
   // Theme switcher
@@ -1523,8 +1501,8 @@ function toggleAdmin() {
 }
 
 function getActiveFilter() {
-  const active = document.querySelector('.date-filter-item.active');
-  return active ? active.dataset.filter : 'all';
+  const select = document.getElementById('dateSelect');
+  return select ? select.value : 'all';
 }
 
 function openPostForm(postId = null) {
