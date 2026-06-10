@@ -281,36 +281,22 @@ body {
   min-height: 50px !important;
   padding: 10px !important;
 }
-.date-filter-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.date-filter-item {
-  padding: 8px 12px;
+.date-select {
+  width: 100%;
+  padding: 10px 12px;
   border-radius: 10px;
-  cursor: pointer;
+  border: 2px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
   font-size: 0.9em;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s;
 }
-.date-filter-item:hover {
-  background: var(--accent-light);
-  color: var(--accent);
-}
-.date-filter-item.active {
-  background: var(--accent);
-  color: white;
-  font-weight: 600;
-}
-.date-filter-count {
-  font-size: 0.75em;
-  opacity: 0.7;
-  margin-left: auto;
+.date-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 /* Theme selector */
@@ -807,27 +793,60 @@ body {
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
+  /* Header: scroll away with page */
+  .header {
+    position: static;
+    padding: 14px 12px;
+  }
+  .header-title { font-size: 1.3em; }
+  .header-subtitle { font-size: 0.75em; }
+
   .app-container {
     flex-direction: column;
-    padding: 12px;
-    gap: 16px;
+    padding: 8px;
+    gap: 8px;
   }
+
+  /* Sidebar: compact 2-col grid, no scroll */
   .sidebar {
     width: 100%;
     position: static;
     max-height: none;
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    overflow: visible;
   }
   .sidebar-card {
-    min-width: 180px;
-    flex-shrink: 0;
+    min-width: 0;
+    flex-shrink: unset;
+    padding: 10px;
+    margin-bottom: 0;
+    font-size: 0.8em;
+    border-radius: 12px;
   }
-  .header-title { font-size: 1.4em; }
-  .post-images { grid-template-columns: repeat(3, 1fr); }
-  .admin-panel { width: 95%; padding: 20px; }
+  /* Profile + About span full width */
+  #profileCard, #aboutCard { grid-column: 1 / -1; }
+
+  .profile-container { gap: 8px; }
+  .profile-avatar-wrap { width: 44px; height: 44px; border-radius: 12px; }
+  .profile-name { font-size: 0.95em; }
+  .profile-bio { font-size: 0.72em; }
+
+  .post-images { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .post-card { border-radius: 14px; }
+  .post-header { padding: 10px 14px 8px; gap: 8px; }
+  .post-avatar { width: 36px; height: 36px; border-radius: 10px; font-size: 1.2em; }
+  .post-title { font-size: 0.95em; }
+  .post-date { font-size: 0.7em; }
+  .post-body { padding: 6px 14px; font-size: 0.85em; }
+  .post-images { padding: 0 14px 10px; }
+  .post-footer { padding: 6px 14px; }
+  .post-tag { font-size: 0.7em; padding: 2px 8px; }
+
+  .admin-panel { width: 95%; padding: 16px; }
+  .music-toggle { width: 46px; height: 46px; bottom: 16px; right: 12px; font-size: 1.2em; border-radius: 14px; }
+  .fab { width: 42px; height: 42px; bottom: 16px; left: 12px; font-size: 1.1em; border-radius: 12px; }
 }
 </style>
 </head>
@@ -889,11 +908,9 @@ body {
     <!-- Date Filter -->
     <div class="sidebar-card">
       <div class="sidebar-title">📅 按日期筛选</div>
-      <ul class="date-filter-list" id="dateFilterList">
-        <li class="date-filter-item active" data-filter="all">
-          🌟 全部动态 <span class="date-filter-count" id="countAll">0</span>
-        </li>
-      </ul>
+      <select class="date-select" id="dateSelect">
+        <option value="all">🌟 全部动态</option>
+      </select>
     </div>
 
     <!-- Theme Switcher -->
@@ -1216,8 +1233,6 @@ function renderTimeline(filterYearMonth = 'all') {
   const postsHTML = sorted.map(post => renderPostCard(post)).join('');
   timeline.innerHTML = `<div class="posts-list">${postsHTML}</div>`;
 
-  // Update date filter count
-  document.getElementById('countAll').textContent = posts.length;
 }
 
 function renderPostCard(post) {
@@ -1268,28 +1283,18 @@ function renderPostCard(post) {
 }
 
 function renderDateFilter() {
-  const list = document.getElementById('dateFilterList');
+  const select = document.getElementById('dateSelect');
+  if (!select) return;
   const yearMonths = getYearMonths();
   const totalCount = posts.length;
 
-  document.getElementById('countAll').textContent = totalCount;
-
-  const monthItems = yearMonths.map(ym => {
+  let html = `<option value="all">🌟 全部动态 (${totalCount})</option>`;
+  yearMonths.forEach(ym => {
     const count = posts.filter(p => p.date && p.date.startsWith(ym)).length;
     const [year, month] = ym.split('-');
-    return `
-      <li class="date-filter-item" data-filter="${ym}">
-        📌 ${year}年${parseInt(month)}月
-        <span class="date-filter-count">${count}</span>
-      </li>`;
-  }).join('');
-
-  list.innerHTML = `
-    <li class="date-filter-item active" data-filter="all">
-      🌟 全部动态 <span class="date-filter-count">${totalCount}</span>
-    </li>
-    ${monthItems}
-  `;
+    html += `<option value="${ym}">📌 ${year}年${parseInt(month)}月 (${count})</option>`;
+  });
+  select.innerHTML = html;
 }
 
 // ============ About Section ============
@@ -1413,12 +1418,8 @@ function cancelProfile() {
 // ============ Events ============
 function bindEvents() {
   // Date filter
-  document.getElementById('dateFilterList').addEventListener('click', (e) => {
-    const item = e.target.closest('.date-filter-item');
-    if (!item) return;
-    document.querySelectorAll('.date-filter-item').forEach(el => el.classList.remove('active'));
-    item.classList.add('active');
-    renderTimeline(item.dataset.filter);
+  document.getElementById('dateSelect').addEventListener('change', (e) => {
+    renderTimeline(e.target.value);
   });
 
   // Theme switcher
@@ -1523,8 +1524,8 @@ function toggleAdmin() {
 }
 
 function getActiveFilter() {
-  const active = document.querySelector('.date-filter-item.active');
-  return active ? active.dataset.filter : 'all';
+  const select = document.getElementById('dateSelect');
+  return select ? select.value : 'all';
 }
 
 function openPostForm(postId = null) {
