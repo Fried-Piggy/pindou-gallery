@@ -287,30 +287,24 @@ body {
   flex-direction: column;
   gap: 4px;
 }
-.date-filter-item {
-  padding: 8px 12px;
+.date-select {
+  width: 100%;
+  padding: 10px 12px;
   border-radius: 10px;
-  cursor: pointer;
+  border: 2px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text-primary);
   font-size: 0.9em;
-  color: var(--text-secondary);
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: auto;
+  transition: border-color 0.2s;
 }
-.date-filter-item:hover {
-  background: var(--accent-light);
-  color: var(--accent);
-}
-.date-filter-item.active {
-  background: var(--accent);
-  color: white;
-  font-weight: 600;
-}
-.date-filter-count {
-  font-size: 0.75em;
-  opacity: 0.7;
-  margin-left: auto;
+.date-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 /* Theme selector */
@@ -809,25 +803,51 @@ body {
 @media (max-width: 768px) {
   .app-container {
     flex-direction: column;
-    padding: 12px;
-    gap: 16px;
+    padding: 8px;
+    gap: 10px;
   }
   .sidebar {
     width: 100%;
     position: static;
     max-height: none;
-    display: flex;
-    gap: 12px;
-    overflow-x: auto;
-    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
   .sidebar-card {
-    min-width: 180px;
-    flex-shrink: 0;
+    margin-bottom: 0;
+    padding: 12px;
+    font-size: 0.85em;
   }
-  .header-title { font-size: 1.4em; }
-  .post-images { grid-template-columns: repeat(3, 1fr); }
-  .admin-panel { width: 95%; padding: 20px; }
+  /* Profile spans full width */
+  #profileCard { grid-column: 1 / -1; }
+  #aboutCard { grid-column: 1 / -1; }
+
+  .profile-container { gap: 10px; }
+  .profile-avatar-wrap { width: 48px; height: 48px; border-radius: 12px; }
+  .profile-name { font-size: 1em; }
+  .profile-bio { font-size: 0.75em; }
+
+  .header { padding: 14px 12px; }
+  .header-title { font-size: 1.3em; }
+  .header-subtitle { font-size: 0.75em; }
+
+  .post-images { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .post-card { border-radius: 14px; }
+  .post-header { padding: 10px 14px 8px; gap: 8px; }
+  .post-avatar { width: 36px; height: 36px; border-radius: 10px; font-size: 1.2em; }
+  .post-title { font-size: 0.95em; }
+  .post-date { font-size: 0.7em; }
+  .post-body { padding: 6px 14px; font-size: 0.85em; }
+  .post-images { padding: 0 14px 12px; }
+  .post-footer { padding: 8px 14px; }
+  .post-tag { font-size: 0.7em; padding: 2px 8px; }
+
+  .admin-panel { width: 95%; padding: 16px; }
+  .music-toggle { width: 48px; height: 48px; bottom: 20px; right: 16px; font-size: 1.3em; border-radius: 14px; }
+  .fab { width: 44px; height: 44px; bottom: 20px; left: 16px; font-size: 1.2em; border-radius: 12px; }
+  .btn-icon { width: 36px; height: 36px; font-size: 1em; }
+  #btnEditProfile, #btnEditAbout { width: 32px; height: 32px; font-size: 0.85em; }
 }
 </style>
 </head>
@@ -889,11 +909,9 @@ body {
     <!-- Date Filter -->
     <div class="sidebar-card">
       <div class="sidebar-title">📅 按日期筛选</div>
-      <ul class="date-filter-list" id="dateFilterList">
-        <li class="date-filter-item active" data-filter="all">
-          🌟 全部动态 <span class="date-filter-count" id="countAll">0</span>
-        </li>
-      </ul>
+      <select class="date-select" id="dateSelect">
+        <option value="all">🌟 全部动态</option>
+      </select>
     </div>
 
     <!-- Theme Switcher -->
@@ -1050,12 +1068,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 function loadSettings() {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
-    if (saved) settings = { ...settings, ...JSON.parse(saved) };
+    if (saved) {
+      const local = JSON.parse(saved);
+      // Only restore UI preferences, NOT profile/about (those come from posts.json)
+      if (local.theme) settings.theme = local.theme;
+      if (local.musicPlaying !== undefined) settings.musicPlaying = local.musicPlaying;
+      if (local.currentTrack !== undefined) settings.currentTrack = local.currentTrack;
+    }
   } catch(e) {}
-  // Ensure aboutText always has a default
-  if (!settings.aboutText) {
-    settings.aboutText = '🧩 这里记录了我的拼豆作品们～\n每一颗豆豆都是用心拼出来的小可爱！';
-  }
   document.body.setAttribute('data-theme', settings.theme);
   updateThemeDots();
 }
@@ -1148,19 +1168,20 @@ function updateStorageInfo() {
 function syncMeta(meta) {
   if (!meta) return;
   let changed = false;
-  if (meta.aboutText && meta.aboutText !== settings.aboutText) {
+  // Always sync these from JSON — it's the source of truth
+  if (meta.aboutText !== undefined) {
     settings.aboutText = meta.aboutText;
     changed = true;
   }
-  if (meta.profileName && meta.profileName !== settings.profileName) {
+  if (meta.profileName !== undefined) {
     settings.profileName = meta.profileName;
     changed = true;
   }
-  if (meta.profileBio !== undefined && meta.profileBio !== settings.profileBio) {
+  if (meta.profileBio !== undefined) {
     settings.profileBio = meta.profileBio;
     changed = true;
   }
-  if (meta.profileAvatar !== undefined && meta.profileAvatar !== settings.profileAvatar) {
+  if (meta.profileAvatar !== undefined) {
     settings.profileAvatar = meta.profileAvatar;
     changed = true;
   }
@@ -1268,28 +1289,18 @@ function renderPostCard(post) {
 }
 
 function renderDateFilter() {
-  const list = document.getElementById('dateFilterList');
+  const select = document.getElementById('dateSelect');
+  if (!select) return;
   const yearMonths = getYearMonths();
   const totalCount = posts.length;
 
-  document.getElementById('countAll').textContent = totalCount;
-
-  const monthItems = yearMonths.map(ym => {
+  let html = `<option value="all">🌟 全部动态 (${totalCount})</option>`;
+  yearMonths.forEach(ym => {
     const count = posts.filter(p => p.date && p.date.startsWith(ym)).length;
     const [year, month] = ym.split('-');
-    return `
-      <li class="date-filter-item" data-filter="${ym}">
-        📌 ${year}年${parseInt(month)}月
-        <span class="date-filter-count">${count}</span>
-      </li>`;
-  }).join('');
-
-  list.innerHTML = `
-    <li class="date-filter-item active" data-filter="all">
-      🌟 全部动态 <span class="date-filter-count">${totalCount}</span>
-    </li>
-    ${monthItems}
-  `;
+    html += `<option value="${ym}">📌 ${year}年${parseInt(month)}月 (${count})</option>`;
+  });
+  select.innerHTML = html;
 }
 
 // ============ About Section ============
@@ -1413,12 +1424,8 @@ function cancelProfile() {
 // ============ Events ============
 function bindEvents() {
   // Date filter
-  document.getElementById('dateFilterList').addEventListener('click', (e) => {
-    const item = e.target.closest('.date-filter-item');
-    if (!item) return;
-    document.querySelectorAll('.date-filter-item').forEach(el => el.classList.remove('active'));
-    item.classList.add('active');
-    renderTimeline(item.dataset.filter);
+  document.getElementById('dateSelect').addEventListener('change', (e) => {
+    renderTimeline(e.target.value);
   });
 
   // Theme switcher
@@ -1523,8 +1530,8 @@ function toggleAdmin() {
 }
 
 function getActiveFilter() {
-  const active = document.querySelector('.date-filter-item.active');
-  return active ? active.dataset.filter : 'all';
+  const select = document.getElementById('dateSelect');
+  return select ? select.value : 'all';
 }
 
 function openPostForm(postId = null) {
@@ -1615,6 +1622,17 @@ async function savePost() {
   renderAll();
   closePostForm();
   showToast('✅ 动态已保存！图片已存入 images/ 文件夹');
+}
+
+async function uploadImage(file, filename) {
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('filename', filename);
+  const resp = await fetch('/upload', { method: 'POST', body: formData });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const result = await resp.json();
+  if (!result.ok) throw new Error(result.error || 'unknown error');
+  return result.filename;
 }
 
 function editPost(id) {
