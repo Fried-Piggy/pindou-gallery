@@ -1050,6 +1050,7 @@ let adminClickCount = 0;
 let editingPostId = null;
 let musicPlaylist = [];
 let droppedImages = []; // [{file, objectUrl, filename}] — temp storage while editing
+let loadedMeta = null; // cached _meta from posts.json
 
 // ============ Init ============
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1096,6 +1097,7 @@ async function loadPosts() {
         posts = data;
       } else if (data && Array.isArray(data.posts)) {
         posts = data.posts;
+        loadedMeta = data._meta;
         syncMeta(data._meta);
       }
     }
@@ -1165,11 +1167,11 @@ function updateStorageInfo() {
 function syncMeta(meta) {
   if (!meta) return;
   let changed = false;
-  if (meta.aboutText && meta.aboutText !== settings.aboutText) {
+  if (meta.aboutText !== undefined && meta.aboutText !== settings.aboutText) {
     settings.aboutText = meta.aboutText;
     changed = true;
   }
-  if (meta.profileName && meta.profileName !== settings.profileName) {
+  if (meta.profileName !== undefined && meta.profileName !== settings.profileName) {
     settings.profileName = meta.profileName;
     changed = true;
   }
@@ -1181,10 +1183,9 @@ function syncMeta(meta) {
     settings.profileAvatar = meta.profileAvatar;
     changed = true;
   }
-  if (meta.musicPlaylist && Array.isArray(meta.musicPlaylist)) {
+  if (meta.musicPlaylist !== undefined && Array.isArray(meta.musicPlaylist) && meta.musicPlaylist.length > 0) {
     musicPlaylist = meta.musicPlaylist;
     localStorage.setItem('pindou_playlist', JSON.stringify(musicPlaylist));
-    renderMusicTracks();
     changed = true;
   }
   if (changed) saveSettings();
@@ -1791,24 +1792,52 @@ function closeLightbox() {
 
 // ============ Music ============
 function initMusicPlayer() {
-  // Default playlist - user can add music files to music/ folder
-  musicPlaylist = [
-    { name: '🎵 音乐1 - 请在 music/ 文件夹添加', src: 'music/track1.mp3' },
-  ];
-
-  // Try to load custom playlist
-  try {
-    const saved = localStorage.getItem('pindou_playlist');
-    if (saved) musicPlaylist = JSON.parse(saved);
-  } catch(e) {}
+  // Directly from JSON _meta (most reliable)
+  if (loadedMeta && loadedMeta.musicPlaylist && Array.isArray(loadedMeta.musicPlaylist) && loadedMeta.musicPlaylist.length > 0) {
+    musicPlaylist = loadedMeta.musicPlaylist;
+  }
+  // Fallback: localStorage
+  if (musicPlaylist.length === 0) {
+    try {
+      const saved = localStorage.getItem('pindou_playlist');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          musicPlaylist = parsed;
+        }
+      }
+    } catch(e) {}
+  }
+  // Last resort: default
+  if (musicPlaylist.length === 0) {
+    musicPlaylist = [
+      { name: '雨蒙蒙_貊炙', src: 'music/雨蒙蒙_貊炙.mp3' },
+    ];
+  }
 
   renderMusicTracks();
 
   const player = document.getElementById('musicPlayer');
   player.addEventListener('ended', playNext);
   player.addEventListener('error', () => {
-    // Silently handle errors for missing music files
+    showToast('⚠️ 音乐文件加载失败，请检查 music/ 文件夹中是否有对应文件');
   });
+
+  // Auto-start first track on first user interaction
+  const toggle = document.getElementById('musicToggle');
+  settings.currentTrack = 0;
+  player.src = musicPlaylist[0] ? musicPlaylist[0].src : '';
+
+  function tryAutoPlay() {
+    player.play().then(() => {
+      toggle.classList.add('playing');
+      toggle.textContent = '🎶';
+      settings.musicPlaying = true;
+      saveSettings();
+    }).catch(() => {});
+  }
+  document.addEventListener('click', tryAutoPlay, { once: true });
+  document.addEventListener('touchstart', tryAutoPlay, { once: true });
 }
 
 function renderMusicTracks() {
@@ -1829,8 +1858,13 @@ function toggleMusicPanel() {
   const player = document.getElementById('musicPlayer');
   const toggle = document.getElementById('musicToggle');
 
+  // Always refresh playlist from loaded JSON data before showing
+  if (loadedMeta && loadedMeta.musicPlaylist && Array.isArray(loadedMeta.musicPlaylist) && loadedMeta.musicPlaylist.length > 0) {
+    musicPlaylist = loadedMeta.musicPlaylist;
+  }
+  renderMusicTracks();
+
   if (player.src && !player.paused) {
-    // Music is playing → pause it
     player.pause();
     toggle.classList.remove('playing');
     toggle.textContent = '🎵';
@@ -1838,7 +1872,6 @@ function toggleMusicPanel() {
     saveSettings();
     panel.classList.remove('visible');
   } else if (player.src && player.paused) {
-    // Music is paused → resume
     player.play().then(() => {
       toggle.classList.add('playing');
       toggle.textContent = '🎶';
@@ -1847,7 +1880,6 @@ function toggleMusicPanel() {
     }).catch(() => {});
     panel.classList.toggle('visible');
   } else {
-    // No music loaded → show panel to pick a track
     panel.classList.toggle('visible');
     if (panel.classList.contains('visible') && musicPlaylist.length > 0) {
       playTrack(settings.currentTrack);
