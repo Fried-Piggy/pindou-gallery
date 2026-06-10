@@ -1,0 +1,46 @@
+{
+  "_meta": {
+    "aboutText": "🧩 这里记录了我的拼豆作品们～\n每一颗豆豆都是用心拼出来的小可爱！",
+    "profileName": "Piggy",
+    "profileBio": "热爱拼豆的手工爱好者 🧩",
+    "profileAvatar": "",
+    "musicPlaylist": [
+      { "name": "🎵 背景音乐", "src": "music/track1.mp3" }
+    ],
+    "exportedAt": "2026-06-10T00:00:00.000Z"
+  },
+  "posts": [
+    {
+      "id": "post_demo_001",
+      "title": "🌟 皮卡丘拼豆挂件",
+      "date": "2026-06-08",
+      "description": "用黄白黑三色豆子拼出来的皮卡丘，挂在包上超可爱！一共用了大概300颗豆子，花了一下午的时间完成。",
+      "images": ["pikachu_01.jpg", "pikachu_02.jpg"],
+      "tags": ["宝可梦", "皮卡丘", "挂件", "像素风"]
+    },
+    {
+      "id": "post_demo_002",
+      "title": "🌸 樱花立体摆件",
+      "date": "2026-06-01",
+      "description": "第一次尝试立体拼豆！做了一棵小小的樱花树，粉粉嫩嫩的超适合春天～放在书桌上每天看着心情都会变好。",
+      "images": ["sakura_tree.jpg"],
+      "tags": ["立体拼豆", "樱花", "摆件", "春日"]
+    },
+    {
+      "id": "post_demo_003",
+      "title": "🎮 马力欧问号方块",
+      "date": "2026-05-20",
+      "description": "经典的马力欧问号方块！黄色背景上做出了渐变效果，远看真的像游戏里蹦出来的一样！",
+      "images": ["mario_block_01.jpg", "mario_block_02.jpg", "mario_block_03.jpg"],
+      "tags": ["马力欧", "游戏", "经典", "像素"]
+    },
+    {
+      "id": "post_demo_004",
+      "title": "🐱 小猫杯垫套装",
+      "date": "2026-05-10",
+      "description": "做了一套四只不同花色的小猫咪杯垫～橘猫、黑猫、白猫、三花猫，每个都有自己的小表情。送了三只给朋友，自己留了橘猫的！",
+      "images": ["cat_coasters.jpg"],
+      "tags": ["猫咪", "杯垫", "实用", "礼物"]
+    }
+  ]
+}
