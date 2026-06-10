@@ -1238,11 +1238,20 @@ function renderAll() {
   setTimeout(initLazyLoad, 100);
 }
 
-function renderTimeline(filterYearMonth = 'all') {
+const PAGE_SIZE = 8;
+let renderedCount = 0;
+let currentFilteredPosts = [];
+
+function renderTimeline(filterYearMonth = 'all', append = false) {
   const timeline = document.getElementById('timeline');
   const sorted = getSortedPosts(filterYearMonth);
 
-  if (sorted.length === 0) {
+  if (!append) {
+    currentFilteredPosts = sorted;
+    renderedCount = 0;
+  }
+
+  if (currentFilteredPosts.length === 0) {
     timeline.innerHTML = `
       <div class="timeline-empty">
         <span class="empty-icon">🧩</span>
@@ -1251,8 +1260,31 @@ function renderTimeline(filterYearMonth = 'all') {
     return;
   }
 
-  const postsHTML = sorted.map(post => renderPostCard(post)).join('');
-  timeline.innerHTML = `<div class="posts-list">${postsHTML}</div>`;
+  const batch = currentFilteredPosts.slice(renderedCount, renderedCount + PAGE_SIZE);
+  renderedCount += batch.length;
+  const batchHTML = batch.map(post => renderPostCard(post)).join('');
+
+  if (!append) {
+    timeline.innerHTML = `<div class="posts-list">${batchHTML}</div>`;
+  } else {
+    timeline.querySelector('.posts-list').insertAdjacentHTML('beforeend', batchHTML);
+  }
+
+  // Add "load more" sentinel if more posts remain
+  const existingSentinel = document.getElementById('loadMoreSentinel');
+  if (existingSentinel) existingSentinel.remove();
+
+  if (renderedCount < currentFilteredPosts.length) {
+    const sentinel = document.createElement('div');
+    sentinel.id = 'loadMoreSentinel';
+    sentinel.style.cssText = 'height:40px;text-align:center;padding:10px;color:var(--text-secondary);font-size:0.85em;cursor:pointer;';
+    sentinel.textContent = `📜 加载更多 (${currentFilteredPosts.length - renderedCount} 条)`;
+    sentinel.addEventListener('click', () => {
+      renderTimeline(filterYearMonth, true);
+      setTimeout(initLazyLoad, 100);
+    });
+    timeline.querySelector('.posts-list').appendChild(sentinel);
+  }
 
 }
 
@@ -1263,9 +1295,11 @@ function renderPostCard(post) {
   const imagesHTML = images.length > 0 ? `
     <div class="post-images">
       ${images.map(img => {
-        const src = 'images/' + img.trim();
+        const fname = img.trim();
+        const thumbSrc = 'images/thumbnails/' + fname;
+        const origSrc = 'images/' + fname;
         return `
-        <div class="post-image-wrap lazy-img-wrap" onclick="openLightbox('${escapeHTML(src)}')" data-src="${escapeHTML(src)}">
+        <div class="post-image-wrap lazy-img-wrap" onclick="openLightbox('${escapeHTML(origSrc)}')" data-src="${escapeHTML(thumbSrc)}" data-orig="${escapeHTML(origSrc)}">
           <div class="post-image-placeholder">🧩</div>
         </div>`;
       }).join('')}
@@ -1950,6 +1984,7 @@ function savePlaylist() {
 let lazyObserver = null;
 function initLazyLoad() {
   if ('IntersectionObserver' in window) {
+    if (lazyObserver) lazyObserver.disconnect();
     lazyObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
@@ -1959,20 +1994,21 @@ function initLazyLoad() {
             const img = document.createElement('img');
             img.src = src;
             img.alt = '';
-            img.onerror = () => { wrap.innerHTML = '<div class=\"post-image-placeholder\">🧩</div>'; };
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            img.onerror = () => { wrap.innerHTML = '<div class=\"post-image-placeholder\">' + '🧩' + '</div>'; };
             img.onload = () => wrap.classList.add('loaded');
             wrap.appendChild(img);
             lazyObserver.unobserve(wrap);
           }
         }
       });
-    }, { rootMargin: '200px' });
-    document.querySelectorAll('.lazy-img-wrap').forEach(w => lazyObserver.observe(w));
+    }, { rootMargin: '300px' });
+    document.querySelectorAll('.lazy-img-wrap:not(.loaded)').forEach(w => lazyObserver.observe(w));
   } else {
-    // Fallback for old browsers
-    document.querySelectorAll('.lazy-img-wrap').forEach(w => {
+    document.querySelectorAll('.lazy-img-wrap:not(.loaded)').forEach(w => {
       const src = w.dataset.src;
-      if (src) w.innerHTML = `<img src="${src}" alt="" onerror="this.parentElement.innerHTML='<div class=\"post-image-placeholder\">🧩</div>'">`;
+      if (src) w.innerHTML = '<img src=\"' + src + '\" alt=\"\" loading=\"lazy\" decoding=\"async\" onerror=\"this.parentElement.innerHTML=\\'<div class=&quot;post-image-placeholder&quot;>' + '🧩' + '</div>\\'\">';
     });
   }
 }

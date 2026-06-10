@@ -35,8 +35,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 filepath = os.path.join(UPLOAD_DIR, f"{base}_{counter}{ext}")
                 counter += 1
 
+            data = fileitem.file.read()
             with open(filepath, 'wb') as f:
-                f.write(fileitem.file.read())
+                f.write(data)
+
+            # Generate thumbnail
+            try:
+                from PIL import Image
+                from io import BytesIO
+                thumb_dir = os.path.join(UPLOAD_DIR, 'thumbnails')
+                os.makedirs(thumb_dir, exist_ok=True)
+                thumb_path = os.path.join(thumb_dir, safe_name)
+                img = Image.open(BytesIO(data))
+                w, h = img.size
+                ratio = min(400/w, 400/h)
+                if ratio < 1:
+                    img = img.resize((int(w*ratio), int(h*ratio)), Image.LANCZOS)
+                img.convert('RGB').save(thumb_path, 'JPEG', quality=70, optimize=True)
+            except Exception as e:
+                print(f'  [WARN] thumbnail failed: {e}')
 
             saved_name = os.path.basename(filepath)
             self.send_json({'ok': True, 'filename': saved_name, 'size': os.path.getsize(filepath)})
