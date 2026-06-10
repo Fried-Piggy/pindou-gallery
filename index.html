@@ -1070,59 +1070,48 @@ function saveSettings() {
 
 // ============ Posts Data ============
 async function loadPosts() {
-  // Try to load from localStorage first
-  const localPosts = localStorage.getItem(STATE_KEY);
-  if (localPosts) {
-    try {
-      const parsed = JSON.parse(localPosts);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        posts = parsed;
-        return;
-      }
-      if (parsed && Array.isArray(parsed.posts) && parsed.posts.length > 0) {
-        posts = parsed.posts;
-        syncMeta(parsed._meta);
-        return;
-      }
-    } catch(e) {}
-  }
-
-  // Try to fetch from posts.json
+  // Always fetch from posts.json — localStorage is too small for image data
   try {
     const resp = await fetch('posts.json');
     if (resp.ok) {
       const data = await resp.json();
       if (Array.isArray(data)) {
-        // Old format: plain array
         posts = data;
       } else if (data && Array.isArray(data.posts)) {
-        // New format: {_meta: {...}, posts: [...]}
         posts = data.posts;
         syncMeta(data._meta);
       }
-      savePostsToLocal();
     }
   } catch(e) {
-    console.log('未找到 posts.json，使用空数据');
-    posts = [];
+    console.log('未找到 posts.json，尝试从 localStorage 恢复...');
+    // Fallback: try localStorage for emergency recovery
+    try {
+      const saved = localStorage.getItem(STATE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        posts = Array.isArray(parsed) ? parsed : (parsed.posts || []);
+        showToast('⚠️ 已从浏览器缓存恢复数据，请尽快导出');
+      } else {
+        posts = [];
+      }
+    } catch(e2) { posts = []; }
   }
+  // Save a lightweight backup (no images) for emergency recovery
+  saveLightBackup();
 }
 
-function savePostsToLocal() {
+function saveLightBackup() {
+  // Strip image data URLs to keep localStorage tiny (metadata only)
   try {
-    const json = JSON.stringify(posts);
-    localStorage.setItem(STATE_KEY, json);
-    // Update storage usage display
+    const lightPosts = posts.map(p => ({
+      ...p,
+      images: (p.images || []).map(img => img.startsWith('data:') ? '[image]' : img)
+    }));
+    localStorage.setItem(STATE_KEY, JSON.stringify(lightPosts));
     updateStorageInfo();
-    return true;
   } catch(e) {
-    if (e.name === 'QuotaExceededError' || e.toString().includes('quota')) {
-      showToast('⚠️ 存储空间已满！请先导出 posts.json 备份，然后清理旧数据');
-    } else {
-      showToast('⚠️ 保存失败：' + e.message);
-    }
-    console.error('localStorage save error:', e);
-    return false;
+    // localStorage full even for light data — unlikely but handle gracefully
+    console.warn('Cannot save backup:', e.message);
   }
 }
 
@@ -1611,10 +1600,10 @@ function savePost() {
     posts.unshift(postData);
   }
 
-  savePostsToLocal();
+  saveLightBackup();
   renderAll();
   closePostForm();
-  showToast('✅ 动态已保存！（自动保存到本地）');
+  showToast('✅ 动态已保存！记得导出 posts.json 保存到本地文件');
 }
 
 function editPost(id) {
@@ -1623,7 +1612,7 @@ function editPost(id) {
 
 function deletePost(id) {
   posts = posts.filter(p => p.id !== id);
-  savePostsToLocal();
+  saveLightBackup();
   renderAll();
   showToast('🗑️ 动态已删除');
 }
@@ -1968,9 +1957,9 @@ function autoSaveMonitor() {
     }
   });
 
-  // Auto-save periodically (in case of crash)
+  // Auto-save light backup periodically
   setInterval(() => {
-    savePostsToLocal();
+    saveLightBackup();
   }, 10000);
 }
 
@@ -1983,8 +1972,8 @@ document.addEventListener('keydown', (e) => {
   }
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault();
-    savePostsToLocal();
-    showToast('💾 数据已自动保存到本地');
+    saveLightBackup();
+    showToast('💾 数据已备份（不含图片）。请记得导出 posts.json');
   }
   if (e.ctrlKey && e.key === 'e') {
     e.preventDefault();
@@ -2022,7 +2011,7 @@ function createExportButton() {
   document.body.appendChild(storageBar);
 
   document.getElementById('btnClearStorage').addEventListener('click', () => {
-    if (confirm('确定要清理浏览器缓存吗？\n\n请先确保已导出 posts.json 备份！\n清理后页面将重新从 posts.json 加载数据。')) {
+    if (confirm('确定要清理浏览器缓存吗？\n\n清理后将强制从 posts.json 重新加载。\n（设置和个人资料不受影响）')) {
       localStorage.removeItem(STATE_KEY);
       location.reload();
     }
