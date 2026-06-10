@@ -846,6 +846,8 @@ body {
   .admin-panel { width: 95%; padding: 16px; }
   .music-toggle { width: 48px; height: 48px; bottom: 20px; right: 16px; font-size: 1.3em; border-radius: 14px; }
   .fab { width: 44px; height: 44px; bottom: 20px; left: 16px; font-size: 1.2em; border-radius: 12px; }
+  .btn-icon { width: 36px; height: 36px; font-size: 1em; }
+  #btnEditProfile, #btnEditAbout { width: 32px; height: 32px; font-size: 0.85em; }
 }
 </style>
 </head>
@@ -1066,12 +1068,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 function loadSettings() {
   try {
     const saved = localStorage.getItem(SETTINGS_KEY);
-    if (saved) settings = { ...settings, ...JSON.parse(saved) };
+    if (saved) {
+      const local = JSON.parse(saved);
+      // Only restore UI preferences, NOT profile/about (those come from posts.json)
+      if (local.theme) settings.theme = local.theme;
+      if (local.musicPlaying !== undefined) settings.musicPlaying = local.musicPlaying;
+      if (local.currentTrack !== undefined) settings.currentTrack = local.currentTrack;
+    }
   } catch(e) {}
-  // Ensure aboutText always has a default
-  if (!settings.aboutText) {
-    settings.aboutText = '🧩 这里记录了我的拼豆作品们～\n每一颗豆豆都是用心拼出来的小可爱！';
-  }
   document.body.setAttribute('data-theme', settings.theme);
   updateThemeDots();
 }
@@ -1164,19 +1168,20 @@ function updateStorageInfo() {
 function syncMeta(meta) {
   if (!meta) return;
   let changed = false;
-  if (meta.aboutText && meta.aboutText !== settings.aboutText) {
+  // Always sync these from JSON — it's the source of truth
+  if (meta.aboutText !== undefined) {
     settings.aboutText = meta.aboutText;
     changed = true;
   }
-  if (meta.profileName && meta.profileName !== settings.profileName) {
+  if (meta.profileName !== undefined) {
     settings.profileName = meta.profileName;
     changed = true;
   }
-  if (meta.profileBio !== undefined && meta.profileBio !== settings.profileBio) {
+  if (meta.profileBio !== undefined) {
     settings.profileBio = meta.profileBio;
     changed = true;
   }
-  if (meta.profileAvatar !== undefined && meta.profileAvatar !== settings.profileAvatar) {
+  if (meta.profileAvatar !== undefined) {
     settings.profileAvatar = meta.profileAvatar;
     changed = true;
   }
